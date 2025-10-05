@@ -11,4 +11,8 @@ module.exports = [
     path: "/inventory",
     file: require("./inventory")
   },
+  {
+    path: "/sales",
+    file: require("./sales")
+  },
 ];

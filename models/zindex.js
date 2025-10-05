@@ -3,4 +3,5 @@ module.exports = {
     superAdmin: require('./super-admin'),
     company: require('./company'),
     inventory: require('./inventory'),
+    sales: require('./sales'),
 }
