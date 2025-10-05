@@ -18,7 +18,7 @@ router.get("/getall",superAdminAuthToken , companyController.getAllCompany)
 
 router.patch("/status/:companyId", superAdminAuthToken , companyController.updateStatus)
 
-router.get("/dashboard/company",superAdminAuthToken, companyController.getDashboardCompany);
+router.get("/dashboard/company",companyAuthToken, companyController.getDashboardCompany);
 
 router.put("/profile/update/:id",companyAuthToken, upload.single("logo"), companyController.updateCompanyProfile);
 

@@ -5,6 +5,8 @@ const { encrypt, decrypt } = require("../../utils/encryptor");
 const fs = require("fs");
 const path = require("path");
 const { inventory } = require("../../models/zindex");
+const Sales = require("../../models/sales");
+const mongoose = require("mongoose");
 
 const deleteFile = (filePath) => {
   fs.unlink(filePath, (err) => {
@@ -122,9 +124,50 @@ exports.updateStatus = asyncHandler(async (req,res) => {
 }) 
 
 exports.getDashboardCompany = asyncHandler(async (req, res) => {
-  const totalCompanies = await Company.countDocuments();
-  const totalVisitor = await inventory.countDocuments();
-  return response.success("Company stats fetched", {totalCompanies,totalVisitor}, res);
+  const companyId = req.user._id;
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  // Inventory data
+  const totalItems = await inventory.countDocuments({ companyId });
+  const totalValue = await inventory.aggregate([
+    { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
+    { $group: { _id: null, total: { $sum: { $multiply: ["$quantity", "$price"] } } } }
+  ]);
+
+  // Sales data
+  const totalSales = await Sales.countDocuments({ companyId, status: 'active' });
+  const monthlySales = await Sales.countDocuments({ 
+    companyId, 
+    status: 'active',
+    saleDate: { $gte: startOfMonth, $lte: endOfMonth } 
+  });
+
+  const totalRevenue = await Sales.aggregate([
+    { $match: { companyId: new mongoose.Types.ObjectId(companyId), status: 'active' } },
+    { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+  ]);
+
+  const monthlyRevenue = await Sales.aggregate([
+    { 
+      $match: { 
+        companyId: new mongoose.Types.ObjectId(companyId), 
+        status: 'active',
+        saleDate: { $gte: startOfMonth, $lte: endOfMonth }
+      } 
+    },
+    { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+  ]);
+
+  return response.success("Dashboard data fetched", {
+    totalItems,
+    totalValue: totalValue[0]?.total || 0,
+    totalSales,
+    monthlySales,
+    totalRevenue: totalRevenue[0]?.total || 0,
+    monthlyRevenue: monthlyRevenue[0]?.total || 0
+  }, res);
 });
 
 exports.updateCompanyProfile = asyncHandler(async (req, res) => {
