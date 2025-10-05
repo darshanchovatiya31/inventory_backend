@@ -15,8 +15,14 @@ exports.getCompanyInventory = asyncHandler(async (req, res) => {
   if (req.query.search) query.name = { $regex: req.query.search, $options: 'i' };
   if (req.query.minQuantity) query.quantity = { $gte: Number(req.query.minQuantity) };
   if (req.query.maxQuantity) query.quantity = { ...query.quantity, $lte: Number(req.query.maxQuantity) };
+  if (req.query.fromDate) query.createdAt = { $gte: new Date(req.query.fromDate) };
+  if (req.query.toDate) query.createdAt = { ...query.createdAt || {}, $lte: new Date(req.query.toDate) };
 
-  const inventories = await Inventory.find(query).sort({ createdAt: -1 });
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const inventories = await Inventory.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit);
   return response.success("Inventories fetched successfully", inventories, res);
 });
 
@@ -28,15 +34,36 @@ exports.getDashboardInventory = asyncHandler(async (req, res) => {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  const totalItems = await Inventory.countDocuments({ companyId });
-  const monthlyItems = await Inventory.countDocuments({ companyId, createdAt: { $gte: startOfMonth, $lte: endOfMonth } });
+  let query = { companyId: new mongoose.Types.ObjectId(companyId) };
 
-  const totalValue = await Inventory.aggregate([
-    { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
+  if (req.query.category) query.category = req.query.category;
+  if (req.query.status) query.status = req.query.status;
+  if (req.query.search) query.name = { $regex: req.query.search, $options: 'i' };
+  if (req.query.minQuantity) query.quantity = { $gte: Number(req.query.minQuantity) };
+  if (req.query.maxQuantity) query.quantity = { ...query.quantity || {}, $lte: Number(req.query.maxQuantity) };
+
+  let periodStart, periodEnd;
+  if (req.query.fromDate) {
+    periodStart = new Date(req.query.fromDate);
+    periodEnd = new Date(req.query.toDate || now);
+    query.createdAt = { $gte: periodStart, $lte: periodEnd };
+  } else {
+    periodStart = startOfMonth;
+    periodEnd = endOfMonth;
+  }
+
+  const totalItems = await Inventory.countDocuments(query);
+
+  const monthlyItems = await Inventory.countDocuments({ ...query, createdAt: { $gte: periodStart, $lte: periodEnd } });
+
+  const totalValueAgg = await Inventory.aggregate([
+    { $match: query },
     { $group: { _id: null, total: { $sum: { $multiply: ["$quantity", "$price"] } } } }
   ]);
+  const totalValue = totalValueAgg[0]?.total || 0;
 
-  const lowStock = await Inventory.countDocuments({ companyId, quantity: { $lt: 10 } });
+  const lowStockQuery = { ...query, quantity: { $lt: 10 } };
+  const lowStock = await Inventory.countDocuments(lowStockQuery);
 
   res.status(200).json({
     status: true,
@@ -44,7 +71,7 @@ exports.getDashboardInventory = asyncHandler(async (req, res) => {
     data: {
       totalItems,
       monthlyItems,
-      totalValue: totalValue[0]?.total || 0,
+      totalValue,
       lowStock
     }
   });

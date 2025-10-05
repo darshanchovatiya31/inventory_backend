@@ -7,12 +7,11 @@ const response = require("../../utils/response");
 // Get all sales for a company with filtering and pagination
 exports.getCompanySales = asyncHandler(async (req, res) => {
   const companyId = req.user._id;
-  let query = { companyId };
+  let query = { companyId, status: 'active' };
 
   // Filtering options
   if (req.query.paymentMethod) query.paymentMethod = req.query.paymentMethod;
   if (req.query.paymentStatus) query.paymentStatus = req.query.paymentStatus;
-  if (req.query.status) query.status = req.query.status;
   if (req.query.customerName) query.customerName = { $regex: req.query.customerName, $options: 'i' };
   if (req.query.paymentReceivedBy) query.paymentReceivedBy = { $regex: req.query.paymentReceivedBy, $options: 'i' };
   
@@ -60,53 +59,64 @@ exports.getSalesDashboard = asyncHandler(async (req, res) => {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
-  const endOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 6));
+
+  let query = { companyId: new mongoose.Types.ObjectId(companyId), status: 'active' };
+
+  // Apply filters
+  if (req.query.paymentMethod) query.paymentMethod = req.query.paymentMethod;
+  if (req.query.paymentStatus) query.paymentStatus = req.query.paymentStatus;
+  if (req.query.customerName) query.customerName = { $regex: req.query.customerName, $options: 'i' };
+  if (req.query.paymentReceivedBy) query.paymentReceivedBy = { $regex: req.query.paymentReceivedBy, $options: 'i' };
+  if (req.query.minAmount) query.totalAmount = { $gte: Number(req.query.minAmount) };
+  if (req.query.maxAmount) query.totalAmount = { ...query.totalAmount, $lte: Number(req.query.maxAmount) };
+
+  let periodStart, periodEnd;
+  if (req.query.startDate && req.query.endDate) {
+    periodStart = new Date(req.query.startDate);
+    periodEnd = new Date(req.query.endDate);
+    query.saleDate = { $gte: periodStart, $lte: periodEnd };
+  } else {
+    periodStart = startOfMonth;
+    periodEnd = endOfMonth;
+  }
 
   // Total sales count
-  const totalSales = await Sales.countDocuments({ companyId, status: 'active' });
+  const totalSales = await Sales.countDocuments(query);
   
-  // Monthly sales count
+  // Monthly/Period sales count
   const monthlySales = await Sales.countDocuments({ 
-    companyId, 
-    status: 'active',
-    saleDate: { $gte: startOfMonth, $lte: endOfMonth } 
-  });
-
-  // Weekly sales count
-  const weeklySales = await Sales.countDocuments({ 
-    companyId, 
-    status: 'active',
-    saleDate: { $gte: startOfWeek, $lte: endOfWeek } 
+    ...query,
+    saleDate: { $gte: periodStart, $lte: periodEnd } 
   });
 
   // Total revenue
-  const totalRevenue = await Sales.aggregate([
-    { $match: { companyId: new mongoose.Types.ObjectId(companyId), status: 'active' } },
+  const totalRevenueAgg = await Sales.aggregate([
+    { $match: query },
     { $group: { _id: null, total: { $sum: "$totalAmount" } } }
   ]);
+  const totalRevenue = totalRevenueAgg[0]?.total || 0;
 
-  // Monthly revenue
-  const monthlyRevenue = await Sales.aggregate([
+  // Monthly/Period revenue
+  const monthlyRevenueAgg = await Sales.aggregate([
     { 
       $match: { 
-        companyId: new mongoose.Types.ObjectId(companyId), 
-        status: 'active',
-        saleDate: { $gte: startOfMonth, $lte: endOfMonth }
+        ...query,
+        saleDate: { $gte: periodStart, $lte: periodEnd }
       } 
     },
     { $group: { _id: null, total: { $sum: "$totalAmount" } } }
   ]);
+  const monthlyRevenue = monthlyRevenueAgg[0]?.total || 0;
 
   // Payment method breakdown
   const paymentBreakdown = await Sales.aggregate([
-    { $match: { companyId: new mongoose.Types.ObjectId(companyId), status: 'active' } },
+    { $match: query },
     { $group: { _id: "$paymentMethod", count: { $sum: 1 }, total: { $sum: "$totalAmount" } } }
   ]);
 
   // Top selling products
   const topProducts = await Sales.aggregate([
-    { $match: { companyId: new mongoose.Types.ObjectId(companyId), status: 'active' } },
+    { $match: query },
     { 
       $group: { 
         _id: "$inventoryId", 
@@ -133,9 +143,8 @@ exports.getSalesDashboard = asyncHandler(async (req, res) => {
     data: {
       totalSales,
       monthlySales,
-      weeklySales,
-      totalRevenue: totalRevenue[0]?.total || 0,
-      monthlyRevenue: monthlyRevenue[0]?.total || 0,
+      totalRevenue,
+      monthlyRevenue,
       paymentBreakdown,
       topProducts
     }
@@ -269,7 +278,7 @@ exports.updateSale = asyncHandler(async (req, res) => {
   return response.success("Sale updated successfully", updatedSale, res);
 });
 
-// Delete a sale (soft delete by changing status)
+// Delete a sale (permanent delete)
 exports.deleteSale = asyncHandler(async (req, res) => {
   const { saleId } = req.params;
   const companyId = req.user._id;
@@ -287,11 +296,10 @@ exports.deleteSale = asyncHandler(async (req, res) => {
     await inventoryItem.save();
   }
 
-  // Soft delete by changing status
-  sale.status = 'cancelled';
-  await sale.save();
+  // Permanent delete
+  await sale.deleteOne();
 
-  return response.success("Sale cancelled successfully", null, res);
+  return response.success("Sale deleted successfully", null, res);
 });
 
 // Get sale details
