@@ -23,7 +23,7 @@ const salesSchema = new mongoose.Schema(
     transactionId: { type: String }, // For online payments
     saleDate: { type: Date, default: Date.now },
     notes: { type: String },
-    soldBy: { type: String }, // Employee name who made the sale
+    paymentReceivedBy: { type: String }, // Employee name who made the sale
     status: { type: String, enum: ["active", "cancelled", "refunded"], default: "active" }
   },
   { timestamps: true }

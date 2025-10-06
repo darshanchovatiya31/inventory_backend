@@ -14,7 +14,7 @@ exports.getCompanySales = asyncHandler(async (req, res) => {
   if (req.query.paymentStatus) query.paymentStatus = req.query.paymentStatus;
   if (req.query.status) query.status = req.query.status;
   if (req.query.customerName) query.customerName = { $regex: req.query.customerName, $options: 'i' };
-  if (req.query.soldBy) query.soldBy = { $regex: req.query.soldBy, $options: 'i' };
+  if (req.query.paymentReceivedBy) query.paymentReceivedBy = { $regex: req.query.paymentReceivedBy, $options: 'i' };
   
   // Date range filtering
   if (req.query.startDate && req.query.endDate) {
@@ -158,7 +158,7 @@ exports.createSale = asyncHandler(async (req, res) => {
     paymentStatus,
     transactionId,
     notes,
-    soldBy
+    paymentReceivedBy
   } = req.body;
 
   if (!inventoryId || !customerName || !quantitySold || !unitPrice || !paymentMethod) {
@@ -190,7 +190,7 @@ exports.createSale = asyncHandler(async (req, res) => {
     paymentStatus: paymentStatus || 'completed',
     transactionId,
     notes,
-    soldBy,
+    paymentReceivedBy,
     saleDate: req.body.saleDate || new Date()
   });
 
@@ -225,7 +225,7 @@ exports.updateSale = asyncHandler(async (req, res) => {
     paymentStatus,
     transactionId,
     notes,
-    soldBy,
+    paymentReceivedBy,
     status
   } = req.body;
 
@@ -257,7 +257,7 @@ exports.updateSale = asyncHandler(async (req, res) => {
   if (paymentStatus) sale.paymentStatus = paymentStatus;
   if (transactionId) sale.transactionId = transactionId;
   if (notes) sale.notes = notes;
-  if (soldBy) sale.soldBy = soldBy;
+  if (paymentReceivedBy) sale.paymentReceivedBy = paymentReceivedBy;
   if (status) sale.status = status;
 
   // Recalculate total amount
