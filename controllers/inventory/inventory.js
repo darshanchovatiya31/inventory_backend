@@ -89,7 +89,7 @@ exports.createInventory = asyncHandler(async (req, res) => {
 
   let image = null;
   if (req.file) {
-    image = req.file.path;
+    image = req.file?.path;
   }
 
   const newInventory = await Inventory.create({
@@ -156,7 +156,7 @@ exports.updateInventory = asyncHandler(async (req, res) => {
     if (inventoryItem.image && fs.existsSync(inventoryItem.image)) {
       fs.unlinkSync(inventoryItem.image);
     }
-    inventoryItem.image = req.file.path;
+    inventoryItem.image = req.file?.path;
   }
 
   await inventoryItem.save();

@@ -16,7 +16,7 @@ const deleteFile = (filePath) => {
 
 exports.createCompany = asyncHandler(async (req, res) => {
   const { name, email, password,mobile,pname,address, isActive } = req.body;
-  const logo = req.file ? req.file.path : null;
+  const logo = req.file ? req.file?.path : null;
 
   if(!name || !email || !password || !mobile || !pname || !address || !isActive){
     if (logo) deleteFile(logo);
@@ -74,7 +74,7 @@ exports.updateCompany = asyncHandler(async (req, res) => {
     if (existingCompany.logo) {
       deleteFile(existingCompany.logo);
     }
-    updates.logo = req.file.path;
+    updates.logo = req.file?.path;
   } else {
     updates.logo = existingCompany.logo
   }
@@ -195,7 +195,7 @@ exports.updateCompanyProfile = asyncHandler(async (req, res) => {
     if (company.logo) {
       deleteFile(company.logo);
     }
-    updates.logo = req.file.path;
+    updates.logo = req.file?.path;
   } else {
     updates.logo = company.logo;
   }
