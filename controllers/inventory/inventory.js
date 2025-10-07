@@ -84,7 +84,7 @@ exports.createInventory = asyncHandler(async (req, res) => {
 
   const { name, description, sku, quantity, price, category, supplier } = req.body;
   if (!name || !sku || !quantity || !price) {
-    return response.badRequest("Required fields missing", res);
+    return response.success("Missing required fields. Please provide name, SKU, quantity, and price.",null, res);
   }
 
   let image = null;
@@ -136,10 +136,13 @@ exports.updateInventory = asyncHandler(async (req, res) => {
 
   const inventoryItem = await Inventory.findOne({ _id: inventoryId, companyId });
   if (!inventoryItem) {
-    return response.notFound("Inventory item not found", res);
+    return response.success("Inventory item not found", null,res);
   }
 
   const { name, description, sku, quantity, price, category, supplier } = req.body;
+  if (!name || !sku || !quantity || !price) {
+    return response.success("Missing required fields. Please provide name, SKU, quantity, and price.",null, res);
+  }
 
   if (name) inventoryItem.name = name;
   if (description) inventoryItem.description = description;
@@ -203,12 +206,12 @@ exports.createStockAdjustment = asyncHandler(async (req, res) => {
   const { inventoryId, type, quantity, price, supplier, notes } = req.body;
 
   if (!inventoryId || !type || !quantity || !price) {
-    return response.badRequest("Required fields missing", res);
+    return response.success("Missing required fields. Please provide type, quantity, and price.", null, res);
   }
 
   const inventoryItem = await Inventory.findOne({ _id: inventoryId, companyId });
   if (!inventoryItem) {
-    return response.notFound("Inventory item not found", res);
+    return response.success("Inventory item not found", null, res);
   }
 
   const adjustmentQuantity = Number(quantity);
@@ -219,7 +222,7 @@ exports.createStockAdjustment = asyncHandler(async (req, res) => {
     newQuantity = inventoryItem.quantity - adjustmentQuantity;
     if (newQuantity < 0) newQuantity = 0; // Prevent negative
   } else {
-    return response.badRequest("Invalid type", res);
+    return response.success("Invalid adjustment type. Must be 'add' or 'subtract'.", null, res);
   }
 
   inventoryItem.quantity = newQuantity;

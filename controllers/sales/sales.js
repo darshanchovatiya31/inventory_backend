@@ -154,7 +154,7 @@ exports.getSalesDashboard = asyncHandler(async (req, res) => {
 // Create a new sale
 exports.createSale = asyncHandler(async (req, res) => {
   const { companyId } = req.params;
-  if (companyId !== req.user._id.toString()) return response.forbidden("Unauthorized", res);
+  if (companyId !== req.user._id.toString()) return response.success("Unauthorized",null, res);
 
   const { 
     inventoryId, 
@@ -171,17 +171,17 @@ exports.createSale = asyncHandler(async (req, res) => {
   } = req.body;
 
   if (!inventoryId || !customerName || !quantitySold || !unitPrice || !paymentMethod) {
-    return response.badRequest("Required fields missing", res);
+    return response.success("Missing required fields. Please provide Customer Name, Quantity, Unit Price.",null, res);
   }
 
   // Check if inventory item exists and has enough stock
   const inventoryItem = await Inventory.findOne({ _id: inventoryId, companyId });
   if (!inventoryItem) {
-    return response.notFound("Inventory item not found", res);
+    return response.success("Inventory item not found",null, res);
   }
 
   if (inventoryItem.quantity < quantitySold) {
-    return response.badRequest("Insufficient stock available", res);
+    return response.success("Insufficient stock available",null, res);
   }
 
   const totalAmount = quantitySold * unitPrice;
@@ -221,7 +221,7 @@ exports.updateSale = asyncHandler(async (req, res) => {
 
   const sale = await Sales.findOne({ _id: saleId, companyId });
   if (!sale) {
-    return response.notFound("Sale not found", res);
+    return response.success("Sale not found",null, res);
   }
 
   const { 
@@ -238,17 +238,21 @@ exports.updateSale = asyncHandler(async (req, res) => {
     status
   } = req.body;
 
+  if (!customerName || !quantitySold || !unitPrice || !paymentMethod) {
+    return response.success("Missing required fields. Please provide Customer Name, Quantity, Unit Price.",null, res);
+  }
+
   // If quantity is being changed, we need to adjust inventory
   if (quantitySold !== undefined && quantitySold !== sale.quantitySold) {
     const inventoryItem = await Inventory.findById(sale.inventoryId);
     if (!inventoryItem) {
-      return response.notFound("Inventory item not found", res);
+      return response.success("Inventory item not found",null, res);
     }
 
     const quantityDifference = Number(quantitySold) - sale.quantitySold;
     
     if (inventoryItem.quantity + quantityDifference < 0) {
-      return response.badRequest("Insufficient stock for this update", res);
+      return response.success("Insufficient stock for this update",null, res);
     }
 
     inventoryItem.quantity += quantityDifference;
@@ -285,7 +289,7 @@ exports.deleteSale = asyncHandler(async (req, res) => {
 
   const sale = await Sales.findOne({ _id: saleId, companyId });
   if (!sale) {
-    return response.notFound("Sale not found", res);
+    return response.success("Sale not found",null, res);
   }
 
   // Restore inventory quantity
